@@ -105,7 +105,7 @@ class DashboardView(discord.ui.View):
         available_sections = []
         for role_id, section_name in all_sections:
             role = guild.get_role(role_id)
-            if role and len(role.members) < 50:
+            if role and len(role.members) <35:
                 available_sections.append((role_id, section_name))
 
         if not available_sections:
@@ -546,7 +546,7 @@ async def dashboard(ctx: discord.ApplicationContext, channel: discord.TextChanne
             "ボットからあなたのRiot ID情報を削除します。\n"
             "## セクションに参加\n"
             "セクションのテキスト、ボイスチャンネルに参加します。\n"
-            "セクションの人数上限は50名です。\n"
+            "セクションの人数上限は35名です。\n"
         ),
         color=discord.Color.blue()
     )
