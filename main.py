@@ -12,6 +12,7 @@ RIOT_API_KEY = os.getenv('RIOT_API_KEY')
 DISCORD_GUILD_ID = int(os.getenv('DISCORD_GUILD_ID'))
 DB_PATH = '/data/lol_bot.db'
 NOTIFICATION_CHANNEL_ID = 1402091279700983819 # 通知用チャンネルID
+HONOR_CHANNEL_ID = 1447166222591594607 # 名誉用チャンネルID
 RANK_ROLES = {
     "IRON": "LoL Iron(Solo/Duo)", "BRONZE": "LoL Bronze(Solo/Duo)", "SILVER": "LoL Silver(Solo/Duo)",
     "GOLD": "LoL Gold(Solo/Duo)", "PLATINUM": "LoL Platinum(Solo/Duo)", "EMERALD": "LoL Emerald(Solo/Duo)",
@@ -63,6 +64,10 @@ my_region_for_summoner = 'jp1'
 class DashboardView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
+
+    @discord.ui.button(label="名誉を贈る", style=discord.ButtonStyle.primary, custom_id="dashboard:give_honor")
+    async def give_honor_button(self, button: discord.ui.Button, interaction: discord.Interaction):
+        await interaction.response.send_modal(GiveHonorModal())
 
     @discord.ui.button(label="Riot IDの登録", style=discord.ButtonStyle.success, custom_id="dashboard:register")
     async def register_button(self, button: discord.ui.Button, interaction: discord.Interaction):
@@ -136,6 +141,21 @@ class DashboardView(discord.ui.View):
             delete_after=180
         )
 
+class GiveHonorModal(discord.ui.Modal):
+    def __init__(self):
+        super().__init__(title="名誉を贈る")
+        self.add_item(discord.ui.InputText(label="名誉を贈りたいユーザー", required=True))
+        self.add_item(discord.ui.InputText(label="名誉を贈りたい理由", required=True))
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        channel = bot.get_channel(HONOR_CHANNEL_ID)
+        embed = discord.Embed(title=f"名誉投票が行われました", color=discord.Color.gold())
+        embed.description = f"{interaction.user.mention}が名誉を贈りました"
+        embed.add_field(name="名誉を贈りたいユーザー", value=self.children[0].value, inline=False)
+        embed.add_field(name="名誉を贈りたい理由", value=self.children[1].value, inline=False)
+        await channel.send(embed=embed)
+        await interaction.followup.send(f"「{self.children[0].value}」に名誉を贈りました！", ephemeral=True, delete_after=30.0)
 
 class RegisterModal(discord.ui.Modal):
     def __init__(self):
@@ -392,14 +412,14 @@ async def create_ranking_embed() -> discord.Embed:
                 # フィールドのvalue上限(1024文字)を超えないように調整
                 if len(field_value) > 1024:
                     field_value = field_value[:1020] + "..."
-                
+
                 # Tierヘッダーのデザインを調整
                 # Tier名の長さに応じて罫線の数を変え、全体の長さを揃える
                 base_length = 28
                 header_core_length = len(tier) + 4 # 太字化の** **分
                 padding_count = max(0, base_length - header_core_length)
                 padding = "─" * padding_count
-                
+
                 header_text = f"{role_emojis[tier]} {tier} {role_emojis[tier]} {padding}"
 
                 embed.add_field(
@@ -539,6 +559,8 @@ async def dashboard(ctx: discord.ApplicationContext, channel: discord.TextChanne
     embed = discord.Embed(
         title="# ダッシュボード", # 絵文字は適当なものに置き換えてください
         description=(
+            "## 名誉を贈る\n"
+            "名誉を贈りたいユーザーと理由を入力してください。\n"
             "## Riot IDの登録\n"
             "あなたのRiot IDをサーバーに登録しましょう！\n"
             f"このボタンからあなたのRiot IDを登録すると、あなたのSolo/Duoランクが24時間ごとに自動でチェックされ、サーバー内のラダーランキング(<#{NOTIFICATION_CHANNEL_ID}>)に反映されます。\n"
