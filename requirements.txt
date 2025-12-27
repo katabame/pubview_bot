@@ -1,2 +1,0 @@
-py-cord
-riotwatcher>=3.3.1
