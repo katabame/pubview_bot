@@ -1,11 +1,14 @@
-import discord
-from discord.ext import tasks
-from riotwatcher import RiotWatcher, LolWatcher, ApiError
 import os
 import sqlite3
 import datetime
 import time
+import random
+import string
 from typing import Any
+import discord
+from discord.ext import tasks
+from riotwatcher import RiotWatcher, LolWatcher, ApiError
+
 
 # --- 設定項目 ---
 DISCORD_TOKEN: str | None = os.getenv('DISCORD_TOKEN')
@@ -14,6 +17,7 @@ DISCORD_GUILD_ID: int = int(os.getenv('DISCORD_GUILD_ID'))
 DB_PATH: str = '/data/lol_bot.db'
 NOTIFICATION_CHANNEL_ID: int = 1402091279700983819 # 通知用チャンネルID
 HONOR_CHANNEL_ID: int = 1447166222591594607 # 名誉用チャンネルID
+VOICE_CREATE_CHANNEL_ID: int = 1469467862358823125  # このチャンネルに入室すると「通話」カテゴリ内に新規ボイスチャンネルが作成される
 RANK_ROLES: dict[str, str] = {
     "IRON": "LoL Iron(Solo/Duo)", "BRONZE": "LoL Bronze(Solo/Duo)", "SILVER": "LoL Silver(Solo/Duo)",
     "GOLD": "LoL Gold(Solo/Duo)", "PLATINUM": "LoL Platinum(Solo/Duo)", "EMERALD": "LoL Emerald(Solo/Duo)",
@@ -813,6 +817,34 @@ async def check_ranks_periodically() -> None:
             await channel.send(f"🎉 **ランクアップ！** 🎉\nおめでとうございます、{user_data['member'].mention}さん ({riot_id_full})！\n**{user_data['old_tier']} {user_data['old_rank']}** → **{user_data['new_tier']} {user_data['new_rank']}** に昇格しました！")
 
     print("--- Periodic rank check finished ---")
+
+@bot.event
+async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, after: discord.VoiceState) -> None:
+    guild: discord.Guild = member.guild
+    category: discord.CategoryChannel | None = discord.utils.get(guild.categories, id=1469467787356410030)
+
+    # 新規ボイスチャンネル作成（指定チャンネルに入室した場合）
+    if after.channel and after.channel.id == VOICE_CREATE_CHANNEL_ID:
+        if not category:
+            return
+        try:
+            new_channel: discord.VoiceChannel = await guild.create_voice_channel(
+                name="".join(random.choices(string.ascii_letters + string.digits, k=5)),
+                category=category,
+                user_limit=0,  # 0=制限なし
+            )
+            await member.move_to(new_channel)
+        except Exception as e:
+            print(f"!!! ボイスチャンネル作成エラー: {e}")
+
+    # 空チャンネル削除（退出したチャンネルが空になった場合）
+    if before.channel and category and before.channel.id != VOICE_CREATE_CHANNEL_ID and before.channel.category_id == category.id:
+        if len(before.channel.members) == 0:
+            try:
+                await before.channel.delete()
+            except Exception as e:
+                print(f"!!! 空チャンネル削除エラー: {e}")
+
 
 # --- Botの起動 ---
 if __name__ == '__main__':
